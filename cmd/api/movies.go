@@ -31,7 +31,17 @@ func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Reques
 	if data.ValidateMovie(v, movie); !v.Valid() {
 		app.failedValidationResponse(w, r, v.Errors)
 	}
-	fmt.Fprintf(w, "%+v\n", input)
+	insertErr := app.models.Movies.Insert(movie)
+	if insertErr != nil {
+		app.serverErrorResponse(w, r, insertErr)
+		return
+	}
+	headers := make(http.Header)
+	headers.Set("Location", fmt.Sprintf("/v1/movies/%d", movie.ID))
+	writeJsonErr := app.writeJSON(w, http.StatusCreated, envelope{"movie": movie}, headers)
+	if writeJsonErr != nil {
+		app.serverErrorResponse(w, r, writeJsonErr)
+	}
 }
 
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
