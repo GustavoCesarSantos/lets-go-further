@@ -1,9 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
-	"time"
+	"strconv"
 
 	"greenlight.gustavosantos.net/internal/data"
 	"greenlight.gustavosantos.net/internal/validator"
@@ -50,15 +51,104 @@ func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request)
 		app.notFoundResponse(w, r)
 		return
 	}
-	movie := data.Movie{
-		ID:        id,
-		Title:     "Dummy title",
-		Runtime:   102,
-		Genres:    []string{"drama", "romance", "war"},
-		Version:   1,
-		CreatedAt: time.Now(),
+	movie, getErr := app.models.Movies.Get(id)
+	if getErr != nil {
+		switch {
+		case errors.Is(getErr, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, getErr)
+		}
+		return
 	}
 	writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
+	if writeJsonErr != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+	movie, getErr := app.models.Movies.Get(id)
+	if getErr != nil {
+		switch {
+		case errors.Is(getErr, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, getErr)
+		}
+		return
+	}
+    if r.Header.Get("X-Expected-Version") != "" {
+        if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
+            app.editConflictResponse(w, r)
+            return
+        }
+    }
+	var input struct {
+		Title   *string       `json:"title"`
+		Year    *int32        `json:"year"`
+		Runtime *data.Runtime `json:"runtime"`
+		Genres  []string      `json:"genres"`
+	}
+	readErr := app.readJSON(w, r, &input)
+	if readErr != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+	if input.Title != nil {
+		movie.Title = *input.Title
+	}
+	if input.Year != nil {
+		movie.Year = *input.Year
+	}
+	if input.Runtime != nil {
+		movie.Runtime = *input.Runtime
+	}
+	if input.Genres != nil {
+		movie.Genres = input.Genres
+	}
+	v := validator.New()
+	if data.ValidateMovie(v, movie); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+	updateErr := app.models.Movies.Update(movie)
+	if updateErr != nil {
+		switch {
+		case errors.Is(updateErr, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, updateErr)
+		}
+		return
+	}
+	writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"movie": movie}, nil)
+	if writeJsonErr != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := app.readIDParam(r)
+	if err != nil {
+		app.notFoundResponse(w, r)
+		return
+	}
+	deleteErr := app.models.Movies.Delete(id)
+	if deleteErr != nil {
+		switch {
+		case errors.Is(deleteErr, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, deleteErr)
+		}
+	}
+	writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"message": "movie successfully deleted"}, nil)
 	if writeJsonErr != nil {
 		app.serverErrorResponse(w, r, err)
 	}
