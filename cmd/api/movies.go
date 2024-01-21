@@ -10,6 +10,44 @@ import (
 	"greenlight.gustavosantos.net/internal/validator"
 )
 
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Title  string
+		Genres []string
+		data.Filters
+	}
+	v := validator.New()
+	qs := r.URL.Query()
+	input.Title = app.readString(qs, "title", "")
+	input.Genres = app.readCSV(qs, "genres", []string{})
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+	input.Filters.SortSafelist = []string{
+		"id",
+		"-id",
+		"title",
+		"-title",
+		"year",
+		"-year",
+		"runtime",
+		"-runtime",
+	}
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+	movies, getAllErr := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
+	if getAllErr != nil {
+		app.serverErrorResponse(w, r, getAllErr)
+		return
+	}
+	writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+	if writeJsonErr != nil {
+		app.serverErrorResponse(w, r, writeJsonErr)
+	}
+}
+
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Title   string       `json:"title"`
@@ -83,12 +121,12 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
-    if r.Header.Get("X-Expected-Version") != "" {
-        if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
-            app.editConflictResponse(w, r)
-            return
-        }
-    }
+	if r.Header.Get("X-Expected-Version") != "" {
+		if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
+			app.editConflictResponse(w, r)
+			return
+		}
+	}
 	var input struct {
 		Title   *string       `json:"title"`
 		Year    *int32        `json:"year"`
