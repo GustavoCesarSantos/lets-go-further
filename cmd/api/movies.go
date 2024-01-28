@@ -37,12 +37,12 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	movies, getAllErr := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
+	movies,metadata, getAllErr := app.models.Movies.GetAll(input.Title, input.Genres, input.Filters)
 	if getAllErr != nil {
 		app.serverErrorResponse(w, r, getAllErr)
 		return
 	}
-	writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"movies": movies}, nil)
+    writeJsonErr := app.writeJSON(w, http.StatusOK, envelope{"movies": movies, "metadata": metadata}, nil)
 	if writeJsonErr != nil {
 		app.serverErrorResponse(w, r, writeJsonErr)
 	}
