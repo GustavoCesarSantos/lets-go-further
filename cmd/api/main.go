@@ -7,11 +7,13 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"greenlight.gustavosantos.net/internal/data"
+	"greenlight.gustavosantos.net/internal/mailer"
 )
 
 const version = "1.0.0"
@@ -30,12 +32,21 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
+	}
 }
 
 type application struct {
 	config config
 	logger *slog.Logger
 	models data.Models
+	mailer mailer.Mailer
+    wg sync.WaitGroup
 }
 
 func main() {
@@ -110,6 +121,21 @@ func main() {
 		os.Exit(1)
 	}
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", enabled, "Enabled rate limiter")
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("SMTP_HOST"), "SMTP host")
+	smtpPort, smtpPortErr := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	if smtpPortErr != nil {
+		logger.Error(smtpPortErr.Error())
+		os.Exit(1)
+	}
+	flag.IntVar(
+		&cfg.smtp.port,
+		"smtp-port",
+		smtpPort,
+		"SMTP port",
+	)
+	flag.StringVar(&cfg.smtp.username, "smtp-username", os.Getenv("SMTP_USERNAME"), "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", os.Getenv("SMTP_PASSWORD"), "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("SMTP_SENDER"), "SMTP sender")
 	flag.Parse()
 	db, openErr := openDB(cfg)
 	if openErr != nil {
@@ -122,6 +148,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 	err := app.serve()
 	if err != nil {
