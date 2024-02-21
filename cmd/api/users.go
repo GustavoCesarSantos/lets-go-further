@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"greenlight.gustavosantos.net/internal/data"
 	"greenlight.gustavosantos.net/internal/validator"
@@ -45,8 +46,17 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+    token, tokenErr := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
+    if tokenErr != nil {
+        app.serverErrorResponse(w, r, tokenErr)
+        return
+    }
     app.background(func() {
-		sendEmailErr := app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+        data := map[string]any{
+            "activationToken": token.Plaintext,
+            "userID": user.ID,
+        }
+		sendEmailErr := app.mailer.Send(user.Email, "user_welcome.tmpl", data)
 		if sendEmailErr != nil {
 			app.logger.Error(sendEmailErr.Error())
 		}

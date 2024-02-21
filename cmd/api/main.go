@@ -51,7 +51,7 @@ type application struct {
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	loadEnvErr := godotenv.Load(".env")
+	loadEnvErr := godotenv.Load(`/home/gustavo/code/estudo/go/lets-go-further/.env`)
 	if loadEnvErr != nil {
 		logger.Error(loadEnvErr.Error())
 		os.Exit(1)
