@@ -169,6 +169,7 @@ func openDB(cfg config) (*sql.DB, error) {
 	defer cancel()
 	pingErr := db.PingContext(ctx)
 	if pingErr != nil {
+		db.Close()
 		return nil, pingErr
 	}
 	return db, nil
