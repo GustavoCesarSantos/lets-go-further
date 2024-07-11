@@ -46,11 +46,11 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
-    permissionError := app.models.Permissions.AddForUser(user.ID, "movies:read")
-    if permissionError != nil {
-        app.serverErrorResponse(w, r, permissionError)
-        return
-    }
+	permissionError := app.models.Permissions.AddForUser(user.ID, "movies:read")
+	if permissionError != nil {
+		app.serverErrorResponse(w, r, permissionError)
+		return
+	}
 	token, tokenErr := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if tokenErr != nil {
 		app.serverErrorResponse(w, r, tokenErr)
