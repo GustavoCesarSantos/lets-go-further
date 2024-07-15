@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"runtime"
@@ -17,9 +18,12 @@ import (
 	_ "github.com/lib/pq"
 	"greenlight.gustavosantos.net/internal/data"
 	"greenlight.gustavosantos.net/internal/mailer"
+	"greenlight.gustavosantos.net/internal/vcs"
 )
 
-const version = "1.0.0"
+var (
+    version = vcs.Version()
+)
 
 type config struct {
 	port int
@@ -146,7 +150,12 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
+    displayVersion := flag.Bool("version", false, "Display version and exit")
 	flag.Parse()
+    if *displayVersion {
+        fmt.Printf("Version:\t%s\n", version)
+        os.Exit(0)
+    }
 	db, openErr := openDB(cfg)
 	if openErr != nil {
 		logger.Error(openErr.Error())

@@ -4,14 +4,15 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
+
 	"greenlight.gustavosantos.net/internal/data"
 	"greenlight.gustavosantos.net/internal/validator"
 )
@@ -88,13 +89,10 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-		}
+		ip := realip.FromRequest(r)
 		mu.Lock()
 		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+			clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
 		}
 		clients[ip].lastSeen = time.Now()
 		if !clients[ip].limiter.Allow() {
