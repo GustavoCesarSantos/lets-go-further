@@ -22,7 +22,7 @@ import (
 )
 
 var (
-    version = vcs.Version()
+	version = vcs.Version()
 )
 
 type config struct {
@@ -48,6 +48,9 @@ type config struct {
 	}
 	cors struct {
 		trustedOrigins []string
+	}
+	jwt struct {
+		secret string
 	}
 }
 
@@ -150,12 +153,13 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
-    displayVersion := flag.Bool("version", false, "Display version and exit")
+	flag.StringVar(&cfg.jwt.secret, "jwt-secret", "", "JWT secret")
+	displayVersion := flag.Bool("version", false, "Display version and exit")
 	flag.Parse()
-    if *displayVersion {
-        fmt.Printf("Version:\t%s\n", version)
-        os.Exit(0)
-    }
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		os.Exit(0)
+	}
 	db, openErr := openDB(cfg)
 	if openErr != nil {
 		logger.Error(openErr.Error())
